@@ -1,10 +1,10 @@
 {
   "akun": "kuriratk",
   "zona_waktu": "+07:00",
-  "jarak_jadwal_jam": 6,
-  "jam_tenang": "22:00-07:00",
   "batas_terlambat_jam": 12,
   "maks_percobaan": 4,
   "jeda_antar_postingan_detik": 20,
+  "jarak_jadwal_jam": 6,
+  "jam_tenang": "22:00-07:00",
   "url_gambar": "https://raw.githubusercontent.com/{repo}/{sha}/antrian/{id}/{berkas}"
 }
