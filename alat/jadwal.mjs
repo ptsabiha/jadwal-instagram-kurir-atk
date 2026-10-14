@@ -1,20 +1,26 @@
 // Alat antrean di PC: menyiapkan, menguji, menyetujui, mengubah, dan membatalkan jadwal.
 // Penerbitan sendiri dilakukan GitHub Actions (terbitkan.mjs).
 //
-//   node alat/jadwal.mjs seri "<folder grid-final>" --mulai "2026-10-20 19:00" [--jeda 15] [--grup nama] [--bingkai45]
-//   node alat/jadwal.mjs tambah "<folder Unggah N>" --waktu "2026-10-20 19:00" [--judul ..] [--grup ..] [--urutan N] [--bingkai45]
+// Tanpa --waktu/--mulai, waktu dihitung otomatis: jarak_jadwal_jam (baku 6 jam) setelah postingan
+// terakhir di antrean, dan slot yang jatuh di jam tenang (22.00–07.00) digeser ke 07.00.
+//
+//   node alat/jadwal.mjs semua ["<folder Konten Instagram Kurir ATK>"] [--mulai ".."] [--bingkai45]
+//        antrekan SEMUA konten yang belum masuk antrean, urut dari yang dibuat lebih dulu
+//   node alat/jadwal.mjs seri "<folder grid-final>" [--mulai "2026-10-20 07:00"] [--jeda-jam 6 | --jeda 15] [--grup nama] [--bingkai45]
+//   node alat/jadwal.mjs tambah "<folder Unggah N>" [--waktu "2026-10-20 19:00"] [--judul ..] [--grup ..] [--urutan N] [--bingkai45]
 //   node alat/jadwal.mjs daftar [--semua] [--json]
-//   node alat/jadwal.mjs uji <id..> | --grup nama          buat wadah di Instagram tanpa menerbitkan
-//   node alat/jadwal.mjs setujui <id..> | --grup nama [--tanpa-uji]   draf → menunggu (lalu tayang otomatis)
+//   node alat/jadwal.mjs uji <id..> | --grup nama | --draf          buat wadah di Instagram tanpa menerbitkan
+//   node alat/jadwal.mjs setujui <id..> | --grup nama | --draf [--tanpa-uji]   draf → menunggu (lalu tayang otomatis)
 //   node alat/jadwal.mjs ubah <id> [--waktu ..] [--caption berkas.txt]
-//   node alat/jadwal.mjs geser --grup nama --mulai ".." [--jeda 15]
-//   node alat/jadwal.mjs batal <id..> | --grup nama
+//   node alat/jadwal.mjs geser --grup nama [--mulai ".."] [--jeda-jam 6 | --jeda 15]
+//   node alat/jadwal.mjs batal <id..> | --grup nama | --draf
 //   node alat/jadwal.mjs status | cek
 import fs from 'node:fs';
 import path from 'node:path';
 import {
   DIR_ANTRIAN, bacaSemua, simpanPost, jalurPost, penghalangGrup, bacaPengaturan, parseWaktu,
   geserMenit, isoZona, formatWIB, slug, periksaCaption, jalankan, git, tarikTerbaru, commitDanPush, repoGitHub,
+  slotBerikut, slotSetelah, keluarJamTenang, peringatanJadwal,
 } from './umum.mjs';
 import { bacaBerkasToken } from './rahasia.mjs';
 
@@ -26,7 +32,7 @@ const { pos, opsi } = bacaArgumen(sisa);
 
 try {
   const fungsi = {
-    seri, tambah: (a, o) => tambah(a[0], o), daftar, uji, setujui, ubah, geser, batal, status, cek,
+    semua: semuaKonten, seri, tambah: (a, o) => tambah(a[0], o), daftar, uji, setujui, ubah, geser, batal, status, cek,
   }[perintah];
   if (!fungsi) {
     const kepala = [];
@@ -119,7 +125,6 @@ function idUnik(dasar) {
 
 function tambah(folder, o) {
   if (!folder) throw new Error('Sebutkan folder postingan (berisi 1.png, 2.png, ... dan caption.txt).');
-  if (!o.waktu) throw new Error('Sebutkan --waktu "YYYY-MM-DD HH:MM" (WIB).');
   const pengaturan = bacaPengaturan();
   const sumber = path.resolve(folder);
   if (!fs.existsSync(sumber)) throw new Error(`Folder tidak ditemukan: ${sumber}`);
@@ -143,10 +148,10 @@ function tambah(folder, o) {
   const bingkai45 = Boolean(o.bingkai45) && r0 < 0.8;
 
   const semua = bacaSemua();
-  const ganda = semua.find((p) => p.sumber === sumber && p.status !== 'batal');
+  const ganda = semua.find((p) => samaJalur(p.sumber, sumber) && p.status !== 'batal');
   if (ganda && !o.paksa) throw new Error(`Folder ini sudah ada di antrean sebagai "${ganda.id}" (${ganda.status}). Pakai --paksa kalau memang mau dua kali.`);
 
-  const waktu = parseWaktu(o.waktu, pengaturan.zona_waktu);
+  const waktu = o.waktuIso || (o.waktu ? parseWaktu(o.waktu, pengaturan.zona_waktu) : slotBerikut(semua, pengaturan));
   const judul = String(o.judul || path.basename(sumber));
   const urutan = o.urutan ? Number(o.urutan) : 0;
   const dasar = o.grup ? `${slug(o.grup)}-${String(urutan).padStart(2, '0')}-${slug(judul)}` : `${waktu.slice(0, 10).replace(/-/g, '')}-${slug(judul)}`;
@@ -178,32 +183,114 @@ function tambah(folder, o) {
   };
   simpanPost(post);
   console.log(`📝 Draf: ${judul} · ${keluar.length} slide ${post.ukuran} · ${formatWIB(waktu)} · caption ${c.panjang} karakter, ${c.tagar} tagar  [${id}]`);
+  if (!o.senyap) for (const p of peringatanJadwal(post, semua, pengaturan)) console.log(`   ⚠️ ${p}`);
   return post;
 }
 
-function seri([induk], o) {
-  if (!induk || !o.mulai) throw new Error('Pakai: seri "<folder>" --mulai "YYYY-MM-DD HH:MM" [--jeda 15] [--grup nama]');
-  const pengaturan = bacaPengaturan();
-  const dirInduk = path.resolve(induk);
-  const anak = fs.readdirSync(dirInduk, { withFileTypes: true })
+function samaJalur(a, b) {
+  if (!a || !b) return false;
+  const rapi = (s) => path.resolve(s).replace(/[\\/]+$/, '');
+  return process.platform === 'win32' ? rapi(a).toLowerCase() === rapi(b).toLowerCase() : rapi(a) === rapi(b);
+}
+
+// Waktu postingan berikutnya dalam satu seri: dengan --jeda/--jeda-jam, tepat sejauh itu
+// (digeser keluar jam tenang); tanpa itu, slot baku berikutnya (07.00/13.00/19.00).
+function waktuBerikut(waktu, o, pengaturan) {
+  const menit = o.jeda ? Number(o.jeda) : o['jeda-jam'] ? Number(o['jeda-jam']) * 60 : 0;
+  if (!menit) return slotSetelah(waktu, pengaturan);
+  return keluarJamTenang(geserMenit(waktu, menit, pengaturan.zona_waktu), pengaturan);
+}
+
+function judulDariFolder(nama) {
+  return (nama.match(/\(([^)]+)\)\s*$/) || nama.match(/-\s*(.+)$/) || [, nama])[1].trim();
+}
+
+function anakUnggah(dirInduk) {
+  return fs.readdirSync(dirInduk, { withFileTypes: true })
     .filter((d) => d.isDirectory() && /^unggah\s*\d+/i.test(d.name))
     .map((d) => ({ nama: d.name, n: Number(d.name.match(/\d+/)[0]) }))
     .sort((a, b) => a.n - b.n);
+}
+
+function seri([induk], o) {
+  if (!induk) throw new Error('Pakai: seri "<folder>" [--mulai "YYYY-MM-DD HH:MM"] [--jeda-jam 6 | --jeda 15] [--grup nama]');
+  const pengaturan = bacaPengaturan();
+  const dirInduk = path.resolve(induk);
+  const anak = anakUnggah(dirInduk);
   if (!anak.length) throw new Error(`Tidak ada subfolder "Unggah N ..." di ${dirInduk}`);
   const grup = String(o.grup || path.basename(dirInduk));
-  const jeda = Number(o.jeda || 15);
-  const mulai = parseWaktu(o.mulai, pengaturan.zona_waktu);
+  let waktu = o.mulai ? parseWaktu(o.mulai, pengaturan.zona_waktu) : slotBerikut(bacaSemua(), pengaturan);
   anak.forEach((a, i) => {
-    const judul = (a.nama.match(/\(([^)]+)\)\s*$/) || a.nama.match(/-\s*(.+)$/) || [, a.nama])[1].trim();
-    const waktu = geserMenit(mulai, i * jeda, pengaturan.zona_waktu).slice(0, 16).replace('T', ' ');
-    tambah(path.join(dirInduk, a.nama), { ...o, waktu, judul, grup, urutan: a.n });
+    if (i > 0) waktu = waktuBerikut(waktu, o, pengaturan);
+    tambah(path.join(dirInduk, a.nama), {
+      ...o, waktuIso: waktu, judul: judulDariFolder(a.nama), grup, urutan: a.n, senyap: Boolean(o.jeda || o['jeda-jam']),
+    });
   });
   console.log(`\n${anak.length} draf dalam grup "${grup}". Belum ada yang dijadwalkan; jalankan "uji" lalu "setujui" setelah pemilik setuju.`);
+}
+
+// Antrekan semua konten yang sudah dibuat tapi belum masuk antrean, tersusun rapi:
+// satuan (grid "Unggah N" atau postingan tunggal) diurutkan dari yang dibuat lebih dulu,
+// grid tetap urut Unggah 1 → N, lalu tiap postingan mendapat slot jarak_jadwal_jam berikutnya.
+function semuaKonten([akar], o) {
+  const pengaturan = bacaPengaturan();
+  const dirAkar = path.resolve(akar || 'D:/PT SABIHA-Ammar/Website/Konten Instagram Kurir ATK');
+  if (!fs.existsSync(dirAkar)) throw new Error(`Folder konten tidak ditemukan: ${dirAkar}`);
+  const sudah = bacaSemua().filter((p) => p.status !== 'batal').map((p) => p.sumber);
+  const belum = (dir) => !sudah.some((s) => samaJalur(s, dir));
+  const adalahPost = (dir) => {
+    const isi = fs.readdirSync(dir);
+    return isi.includes('caption.txt') && isi.some((f) => /^1\.(png|jpe?g)$/i.test(f));
+  };
+
+  const satuan = [];
+  (function telusur(dir, dalam) {
+    const anak = anakUnggah(dir).filter((a) => adalahPost(path.join(dir, a.nama)));
+    if (anak.length) {
+      satuan.push({ jenis: 'grid', dir, grup: path.basename(dir), anak, lahir: fs.statSync(dir).birthtimeMs });
+      return;
+    }
+    for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!d.isDirectory() || /^[._]/.test(d.name)) continue;
+      const p = path.join(dir, d.name);
+      if (adalahPost(p)) satuan.push({ jenis: 'tunggal', dir: p, lahir: fs.statSync(p).birthtimeMs });
+      else if (dalam < 3) telusur(p, dalam + 1);
+    }
+  })(dirAkar, 1);
+  satuan.sort((a, b) => a.lahir - b.lahir);
+
+  let jumlah = 0;
+  let pertama = Boolean(o.mulai);
+  const tambahBerikut = (folder, ekstra) => {
+    const waktuIso = pertama ? parseWaktu(o.mulai, pengaturan.zona_waktu) : undefined;
+    pertama = false;
+    tambah(folder, { ...o, ...ekstra, waktuIso });
+    jumlah++;
+  };
+  for (const s of satuan) {
+    if (s.jenis === 'grid') {
+      for (const a of s.anak) {
+        const folder = path.join(s.dir, a.nama);
+        if (belum(folder)) tambahBerikut(folder, { judul: judulDariFolder(a.nama), grup: s.grup, urutan: a.n });
+      }
+    } else if (belum(s.dir)) {
+      tambahBerikut(s.dir, { judul: path.basename(s.dir) });
+    }
+  }
+  if (!jumlah) return console.log(`Semua konten di ${dirAkar} sudah ada di antrean.`);
+  const draf = bacaSemua().filter((p) => p.status === 'draf');
+  console.log(`\n${jumlah} draf baru, tayang ${formatWIB(draf[0].waktu)} sampai ${formatWIB(draf.at(-1).waktu)}.`);
+  console.log('Belum ada yang dijadwalkan; jalankan "uji --draf" lalu "setujui --draf" setelah pemilik setuju.');
 }
 
 // ---------- Melihat ----------
 
 function pilih(pos, o, semua) {
+  if (o.draf) {
+    const hasil = semua.filter((p) => p.status === 'draf');
+    if (!hasil.length) throw new Error('Tidak ada draf di antrean.');
+    return hasil;
+  }
   if (o.grup) {
     const hasil = semua.filter((p) => p.grup === o.grup);
     if (!hasil.length) throw new Error(`Grup "${o.grup}" tidak ada.`);
@@ -303,9 +390,12 @@ function setujui(pos, o) {
   }
   target.forEach(simpanPost);
   commitDanPush(`⏰ Dijadwalkan: ${target.map((p) => p.judul).join(', ')}`, target.map((p) => jalurPost(p.id)));
+  const pengaturan = bacaPengaturan();
+  const kini = bacaSemua();
   for (const p of target) {
     const lewat = new Date(p.waktu) < sekarang;
     console.log(`⏰ ${p.judul}: ${formatWIB(p.waktu)}${lewat ? ' (waktunya sudah lewat, tayang pada putaran penerbit berikutnya ≤ 15 menit)' : ''}`);
+    for (const w of peringatanJadwal(p, kini, pengaturan)) console.log(`   ⚠️ ${w}`);
   }
   console.log('Penerbit di GitHub memeriksa antrean tiap 15 menit; GitHub kadang terlambat beberapa menit.');
 }
@@ -317,7 +407,8 @@ function bisaDiubah(p) {
 function ubah([id], o) {
   tarikTerbaru();
   const pengaturan = bacaPengaturan();
-  const [p] = pilih([id], {}, bacaSemua());
+  const semua = bacaSemua();
+  const [p] = pilih([id], {}, semua);
   bisaDiubah(p);
   if (o.waktu) p.waktu = parseWaktu(o.waktu, pengaturan.zona_waktu);
   if (o.caption) {
@@ -331,17 +422,20 @@ function ubah([id], o) {
   simpanPost(p);
   if (p.status !== 'draf') commitDanPush(`✏️ Diubah: ${p.judul}`, [jalurPost(p.id)]);
   console.log(`✏️ ${p.judul}: ${p.status}, ${formatWIB(p.waktu)}`);
+  for (const w of peringatanJadwal(p, semua, pengaturan)) console.log(`   ⚠️ ${w}`);
 }
 
 function geser(pos, o) {
-  if (!o.grup || !o.mulai) throw new Error('Pakai: geser --grup nama --mulai "YYYY-MM-DD HH:MM" [--jeda 15]');
+  if (!o.grup) throw new Error('Pakai: geser --grup nama [--mulai "YYYY-MM-DD HH:MM"] [--jeda-jam 6 | --jeda 15]');
   tarikTerbaru();
   const pengaturan = bacaPengaturan();
-  const target = bacaSemua().filter((p) => p.grup === o.grup && !['terbit', 'batal'].includes(p.status));
+  const semua = bacaSemua();
+  const target = semua.filter((p) => p.grup === o.grup && !['terbit', 'batal'].includes(p.status));
   if (!target.length) throw new Error(`Tidak ada postingan grup "${o.grup}" yang bisa digeser.`);
-  const mulai = parseWaktu(o.mulai, pengaturan.zona_waktu);
+  let waktu = o.mulai ? parseWaktu(o.mulai, pengaturan.zona_waktu) : slotBerikut(semua.filter((p) => !target.includes(p)), pengaturan);
   target.forEach((p, i) => {
-    p.waktu = geserMenit(mulai, i * Number(o.jeda || 15), pengaturan.zona_waktu);
+    if (i > 0) waktu = waktuBerikut(waktu, o, pengaturan);
+    p.waktu = waktu;
     if (p.status === 'gagal') { p.status = 'menunggu'; p.percobaan = 0; p.galat = null; }
     simpanPost(p);
     console.log(`↪️ ${p.judul}: ${formatWIB(p.waktu)} (${p.status})`);
