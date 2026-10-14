@@ -11,17 +11,23 @@ import { bacaPengaturan, tulisPengaturan, isoZona, formatWIB, commitDanPush } fr
 let antreanPipa = null; // untuk pengujian: masukan lewat pipa, satu jawaban per baris
 
 async function tanya(teks, { sembunyi = false } = {}) {
-  process.stdout.write(teks);
   if (!process.stdin.isTTY) {
+    process.stdout.write(teks);
     antreanPipa ??= fs.readFileSync(0, 'utf8').split(/\r?\n/);
     const jawab = (antreanPipa.shift() || '').trim();
     process.stdout.write(sembunyi ? `[${jawab.length} karakter]\n` : `${jawab}\n`);
     return jawab;
   }
   if (!sembunyi) {
+    // readline menghapus baris tempat kursor berada saat bertanya, jadi baris terakhir pertanyaan
+    // harus diberikan ke rl.question, bukan ditulis lebih dulu (kalau tidak, pertanyaannya hilang).
+    const baris = teks.split('\n');
+    const akhir = baris.pop();
+    if (baris.length) console.log(baris.join('\n'));
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    return new Promise((r) => rl.question('', (j) => { rl.close(); r(j.trim()); }));
+    return new Promise((r) => rl.question(akhir, (j) => { rl.close(); r(j.trim()); }));
   }
+  process.stdout.write(teks);
   return new Promise((selesai) => {
     let isi = '';
     const stdin = process.stdin;
@@ -81,7 +87,11 @@ async function utama() {
     const j = await tanya(`\nPERHATIAN: penjadwal ini sebelumnya memakai @${pengaturan.akun}, bukan @${saya.username}.\nKetik GANTI untuk memakai @${saya.username}, atau tekan Enter untuk batal: `);
     if (j !== 'GANTI') throw new Error('Dibatalkan. Tidak ada yang diubah.');
   } else {
-    const j = await tanya(`\nPostingan terjadwal akan tayang di @${saya.username}. Lanjutkan? (y/n): `);
+    // Enter kosong (mis. sisa dari menempel token) tidak dianggap jawaban; tanya ulang.
+    let j = '';
+    for (let i = 0; i < 3 && !/^(y|ya|n|t|tidak)$/i.test(j); i++) {
+      j = await tanya(`${i ? '' : '\n'}Postingan terjadwal akan tayang di @${saya.username}. Lanjutkan? Ketik y lalu Enter (n = batal): `);
+    }
     if (!/^(y|ya)$/i.test(j)) throw new Error('Dibatalkan. Tidak ada yang diubah.');
   }
 
