@@ -345,7 +345,7 @@ async function jalankanPenerbit(mode, post) {
   console.log(` ${info.conclusion || info.status}`);
   const log = jalankan('gh', ['run', 'view', String(run.databaseId), '-R', repo, '--log'], { bolehGagal: true }).stdout || '';
   const pesan = log.split('\n').filter((b) => b.split('\t')[1] === 'Penerbit')
-    .map((b) => b.split('\t').slice(2).join('\t').replace(/^\S+Z\s?/, '').replace(/\x1b\[[0-9;]*m/g, ''))
+    .map((b) => b.split('\t').slice(2).join('\t').replace(/^﻿?\d{4}-\d\d-\d\dT[\d:.]+Z\s?/, '').replace(/(\x1b|\^\[)\[[0-9;]*m/g, ''))
     .filter((b) => b && !/^(##\[|Run |\s*node |\s*shell:|\s*env:|\s*(MODE|POST|KUNCI_PRIVAT|GIT_\w+):)/.test(b));
   if (pesan.length) console.log(pesan.map((b) => `  ${b}`).join('\n'));
   console.log(`  ${info.url}`);
