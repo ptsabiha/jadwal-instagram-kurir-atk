@@ -6,7 +6,7 @@
 // Token diperpanjang otomatis kalau sudah berumur ≥ 6 hari.
 import fs from 'node:fs';
 import { buatKlien, GalatIG, jenisGalat, jelaskanGalat } from './ig.mjs';
-import { bacaBerkasToken, tulisBerkasToken, kunciDariEnv, bukaSandi, JALUR_TOKEN } from './rahasia.mjs';
+import { bacaBerkasToken, tulisBerkasToken, kunciPrivatDariEnv, bacaKunciPublik, bukaSandi, JALUR_TOKEN } from './rahasia.mjs';
 import {
   bacaSemua, simpanPost, jalurPost, penghalangGrup, bacaPengaturan, commitDanPush,
   isoZona, formatWIB, repoGitHub, git,
@@ -51,8 +51,7 @@ async function utama() {
   }
 
   if (!berkas) throw new Error('Token Instagram belum dipasang. Jalankan "Pasang Token Instagram.bat".');
-  const kunci = kunciDariEnv();
-  let token = bukaSandi(berkas, kunci);
+  let token = bukaSandi(berkas, kunciPrivatDariEnv());
   if (process.env.GITHUB_ACTIONS) console.log(`::add-mask::${token}`);
   let ig = buatKlien(token);
 
@@ -72,7 +71,7 @@ async function utama() {
     try {
       const baru = await ig.get('/refresh_access_token', { grant_type: 'ig_refresh_token' });
       const kini = new Date();
-      tulisBerkasToken(baru.access_token, kunci, {
+      tulisBerkasToken(baru.access_token, bacaKunciPublik(), {
         akun: saya.username,
         user_id: String(igId),
         diperbarui: isoZona(kini),

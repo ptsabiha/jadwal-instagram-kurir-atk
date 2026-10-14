@@ -15,6 +15,7 @@
 //   node alat/jadwal.mjs geser --grup nama [--mulai ".."] [--jeda-jam 6 | --jeda 15]
 //   node alat/jadwal.mjs batal <id..> | --grup nama | --draf
 //   node alat/jadwal.mjs status | cek
+//   node alat/jadwal.mjs kirim        kirim commit lokal (mis. dari Pasang Token Instagram.bat) ke GitHub
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -32,7 +33,7 @@ const { pos, opsi } = bacaArgumen(sisa);
 
 try {
   const fungsi = {
-    semua: semuaKonten, seri, tambah: (a, o) => tambah(a[0], o), daftar, uji, setujui, ubah, geser, batal, status, cek,
+    semua: semuaKonten, seri, tambah: (a, o) => tambah(a[0], o), daftar, uji, setujui, ubah, geser, batal, status, cek, kirim,
   }[perintah];
   if (!fungsi) {
     const kepala = [];
@@ -345,7 +346,7 @@ async function jalankanPenerbit(mode, post) {
   const log = jalankan('gh', ['run', 'view', String(run.databaseId), '-R', repo, '--log'], { bolehGagal: true }).stdout || '';
   const pesan = log.split('\n').filter((b) => b.split('\t')[1] === 'Penerbit')
     .map((b) => b.split('\t').slice(2).join('\t').replace(/^\S+Z\s?/, '').replace(/\x1b\[[0-9;]*m/g, ''))
-    .filter((b) => b && !/^(##\[|Run |\s*node |\s*shell:|\s*env:|\s*(MODE|POST|KUNCI_TOKEN|GIT_\w+):)/.test(b));
+    .filter((b) => b && !/^(##\[|Run |\s*node |\s*shell:|\s*env:|\s*(MODE|POST|KUNCI_PRIVAT|GIT_\w+):)/.test(b));
   if (pesan.length) console.log(pesan.map((b) => `  ${b}`).join('\n'));
   console.log(`  ${info.url}`);
   tarikTerbaru();
@@ -480,6 +481,8 @@ function status() {
   console.log(`Antrean: ${Object.entries(hitung).map(([s, n]) => `${n} ${s}`).join(', ') || 'kosong'}`);
   const berikut = semua.find((x) => x.status === 'menunggu');
   if (berikut) console.log(`Berikutnya: ${berikut.judul}, ${formatWIB(berikut.waktu)}`);
+  const lokal = belumTerkirim();
+  if (lokal) console.log(`⚠️ ${lokal} commit lokal belum terkirim ke GitHub (mis. token baru). Jalankan "kirim".`);
   const repo = repoGitHub();
   if (!repo) return;
   const r = jalankan('gh', ['run', 'list', '-R', repo, '--workflow', 'terbitkan.yml', '-L', '6', '--json', 'conclusion,status,createdAt,event,url'], { bolehGagal: true });
@@ -491,5 +494,21 @@ function status() {
 
 async function cek() {
   await jalankanPenerbit('cek');
+}
+
+function belumTerkirim() {
+  const r = git(['rev-list', '--count', '@{u}..HEAD'], { bolehGagal: true });
+  return r.status === 0 ? Number(r.stdout.trim()) : 0;
+}
+
+function kirim() {
+  const kotor = git(['status', '--porcelain', '--', 'rahasia', 'pengaturan.json'], { bolehGagal: true }).stdout.trim();
+  if (kotor) commitDanPush('🔑 Token Instagram dipasang', ['rahasia', 'pengaturan.json'], { push: false });
+  tarikTerbaru();
+  const n = belumTerkirim();
+  if (!n) return console.log('Tidak ada perubahan lokal yang perlu dikirim.');
+  const r = git(['push', '--quiet'], { bolehGagal: true });
+  if (r.status !== 0) throw new Error(`Gagal mengirim ke GitHub:\n${(r.stderr || r.stdout).trim()}`);
+  console.log(`✅ ${n} commit lokal terkirim ke GitHub.`);
 }
 

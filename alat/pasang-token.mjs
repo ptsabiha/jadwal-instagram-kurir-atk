@@ -1,11 +1,12 @@
 // Dijalankan pemilik lewat "Pasang Token Instagram.bat".
-// Token ditempel di jendela ini dan tidak pernah ditampilkan. Token dienkripsi ke
-// rahasia/token-ig.json, dan kuncinya dikirim ke GitHub Secrets (KUNCI_TOKEN) lewat gh.
+// Token ditempel di jendela ini dan tidak pernah ditampilkan. Token dikunci dengan gembok publik
+// (rahasia/kunci-publik.pem) ke rahasia/token-ig.json lalu di-commit di folder ini saja.
+// PC pemilik tidak perlu login GitHub; Claude yang mengirim commit itu (jadwal.mjs kirim).
 import fs from 'node:fs';
 import readline from 'node:readline';
 import { buatKlien, jelaskanGalat } from './ig.mjs';
-import { buatKunci, tulisBerkasToken, JALUR_TOKEN } from './rahasia.mjs';
-import { bacaPengaturan, tulisPengaturan, isoZona, formatWIB, jalankan, tarikTerbaru, commitDanPush, repoGitHub } from './umum.mjs';
+import { bacaKunciPublik, tulisBerkasToken, JALUR_TOKEN } from './rahasia.mjs';
+import { bacaPengaturan, tulisPengaturan, isoZona, formatWIB, commitDanPush } from './umum.mjs';
 
 let antreanPipa = null; // untuk pengujian: masukan lewat pipa, satu jawaban per baris
 
@@ -51,13 +52,7 @@ async function utama() {
   console.log('  Pasang Token Instagram untuk penjadwal Kurir ATK');
   console.log('==============================================\n');
 
-  const repo = repoGitHub();
-  if (!repo) throw new Error('Folder ini belum tersambung ke repo GitHub. Minta Claude menyiapkannya dulu.');
-  const lewatiGh = Boolean(process.env.PASANG_KUNCI_KE_BERKAS); // hanya untuk pengujian
-  if (!lewatiGh && jalankan('gh', ['auth', 'status'], { bolehGagal: true }).status !== 0) {
-    throw new Error('GitHub CLI belum login. Jalankan "gh auth login" dulu, atau minta bantuan Claude.');
-  }
-  tarikTerbaru();
+  const gembok = bacaKunciPublik();
 
   console.log('Salin token dari halaman Meta for Developers (tombol "Generate token"),');
   console.log('lalu tempel di sini dengan klik kanan atau Ctrl+V. Isinya tidak akan terlihat.\n');
@@ -90,16 +85,8 @@ async function utama() {
     if (!/^(y|ya)$/i.test(j)) throw new Error('Dibatalkan. Tidak ada yang diubah.');
   }
 
-  const kunci = buatKunci();
-  if (lewatiGh) {
-    fs.writeFileSync(process.env.PASANG_KUNCI_KE_BERKAS, kunci);
-  } else {
-    console.log('\nMenyimpan kunci ke GitHub Secrets...');
-    jalankan('gh', ['secret', 'set', 'KUNCI_TOKEN', '-R', repo], { input: kunci });
-  }
-
   const kini = new Date();
-  tulisBerkasToken(token, kunci, {
+  tulisBerkasToken(token, gembok, {
     akun: saya.username,
     user_id: igId,
     diperbarui: isoZona(kini),
@@ -107,11 +94,17 @@ async function utama() {
     kedaluwarsa_perkiraan: true,
   });
   tulisPengaturan({ ...pengaturan, akun: saya.username });
-  commitDanPush(`🔑 Token Instagram dipasang (@${saya.username})`, [JALUR_TOKEN, 'pengaturan.json']);
+  try {
+    // Commit di folder ini saja. PC ini tidak perlu login GitHub; Claude yang mengirimnya.
+    commitDanPush(`🔑 Token Instagram dipasang (@${saya.username})`, [JALUR_TOKEN, 'pengaturan.json'], { push: false });
+  } catch {
+    // Kalau git tidak tersedia di sini, berkasnya tetap tersimpan dan Claude yang meng-commit.
+  }
 
-  console.log(`\nSelesai. Token tersimpan terenkripsi dan berlaku sekitar 60 hari (sampai ${formatWIB(isoZona(new Date(kini.getTime() + 60 * 86400000)))}).`);
-  console.log('Penjadwal akan memperpanjangnya sendiri setiap minggu.');
-  console.log('Kembali ke Claude dan katakan: "token Instagram sudah dipasang".');
+  console.log(`\nSelesai. Token sudah dikunci dan disimpan di folder ini, berlaku sekitar 60 hari`);
+  console.log(`(sampai ${formatWIB(isoZona(new Date(kini.getTime() + 60 * 86400000)))}). Penjadwal akan memperpanjangnya sendiri setiap minggu.`);
+  console.log('\nKembali ke Claude dan katakan: "token Instagram sudah dipasang".');
+  console.log('Claude akan mengirimnya ke GitHub dan mengujinya.');
 }
 
 utama().catch((e) => {

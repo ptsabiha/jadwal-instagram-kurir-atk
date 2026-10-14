@@ -1,6 +1,9 @@
-// Token Instagram disimpan terenkripsi (AES-256-GCM) di rahasia/token-ig.json.
-// Kuncinya hanya ada di GitHub Secrets (KUNCI_TOKEN), jadi repo boleh publik.
-// Dengan cara ini penerbit di GitHub bisa memperpanjang token sendiri tiap minggu.
+// Token Instagram disimpan terenkripsi di rahasia/token-ig.json memakai "gembok publik"
+// rahasia/kunci-publik.pem (RSA-OAEP-SHA256 membungkus kunci AES-256-GCM).
+// Kunci pembukanya (KUNCI_PRIVAT) hanya ada di GitHub Secrets. Akibatnya:
+// - repo boleh publik;
+// - PC pemilik tidak perlu login GitHub untuk memasang token (cukup gembok publik);
+// - penerbit di GitHub bisa membuka token, memperpanjangnya, lalu menguncinya lagi sendiri.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,33 +11,56 @@ import { AKAR } from './umum.mjs';
 
 export const BERKAS_TOKEN = path.join(AKAR, 'rahasia', 'token-ig.json');
 export const JALUR_TOKEN = 'rahasia/token-ig.json';
+export const BERKAS_KUNCI_PUBLIK = path.join(AKAR, 'rahasia', 'kunci-publik.pem');
+export const JALUR_KUNCI_PUBLIK = 'rahasia/kunci-publik.pem';
 
-export function buatKunci() {
-  return crypto.randomBytes(32).toString('hex');
+const OAEP = { padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' };
+
+export function buatPasanganKunci() {
+  return crypto.generateKeyPairSync('rsa', {
+    modulusLength: 3072,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
 }
 
-export function kunciDariEnv() {
-  const hex = String(process.env.KUNCI_TOKEN || '').trim();
-  if (!/^[0-9a-f]{64}$/i.test(hex)) {
-    throw new Error('KUNCI_TOKEN belum ada di GitHub Secrets atau formatnya salah. Jalankan "Pasang Token Instagram.bat" lagi.');
+export function bacaKunciPublik() {
+  if (!fs.existsSync(BERKAS_KUNCI_PUBLIK)) {
+    throw new Error('Gembok publik (rahasia/kunci-publik.pem) belum ada. Minta Claude menjalankan alat/buat-kunci.mjs dulu.');
   }
-  return hex;
+  return fs.readFileSync(BERKAS_KUNCI_PUBLIK, 'utf8');
 }
 
-export function sandikan(token, kunciHex) {
+export function kunciPrivatDariEnv() {
+  const pem = String(process.env.KUNCI_PRIVAT || '').trim();
+  if (!pem.includes('PRIVATE KEY')) {
+    throw new Error('KUNCI_PRIVAT belum ada di GitHub Secrets. Minta Claude menjalankan alat/buat-kunci.mjs.');
+  }
+  return pem;
+}
+
+export function sandikan(token, kunciPublikPem) {
+  const kunciAes = crypto.randomBytes(32);
   const iv = crypto.randomBytes(12);
-  const c = crypto.createCipheriv('aes-256-gcm', Buffer.from(kunciHex, 'hex'), iv);
+  const c = crypto.createCipheriv('aes-256-gcm', kunciAes, iv);
   const data = Buffer.concat([c.update(token, 'utf8'), c.final()]);
-  return { iv: iv.toString('base64'), tag: c.getAuthTag().toString('base64'), data: data.toString('base64') };
+  return {
+    versi: 2,
+    kunci: crypto.publicEncrypt({ key: kunciPublikPem, ...OAEP }, kunciAes).toString('base64'),
+    iv: iv.toString('base64'),
+    tag: c.getAuthTag().toString('base64'),
+    data: data.toString('base64'),
+  };
 }
 
-export function bukaSandi(berkas, kunciHex) {
+export function bukaSandi(berkas, kunciPrivatPem) {
   try {
-    const d = crypto.createDecipheriv('aes-256-gcm', Buffer.from(kunciHex, 'hex'), Buffer.from(berkas.iv, 'base64'));
+    const kunciAes = crypto.privateDecrypt({ key: kunciPrivatPem, ...OAEP }, Buffer.from(berkas.kunci, 'base64'));
+    const d = crypto.createDecipheriv('aes-256-gcm', kunciAes, Buffer.from(berkas.iv, 'base64'));
     d.setAuthTag(Buffer.from(berkas.tag, 'base64'));
     return Buffer.concat([d.update(Buffer.from(berkas.data, 'base64')), d.final()]).toString('utf8');
   } catch {
-    throw new Error('Token tidak bisa dibuka dengan KUNCI_TOKEN yang ada. Jalankan "Pasang Token Instagram.bat" lagi.');
+    throw new Error('Token tidak bisa dibuka dengan KUNCI_PRIVAT yang ada (mungkin dikunci dengan gembok lama). Jalankan "Pasang Token Instagram.bat" lagi.');
   }
 }
 
@@ -44,8 +70,7 @@ export function bacaBerkasToken() {
 }
 
 // meta: { akun, user_id, diperbarui, kedaluwarsa, kedaluwarsa_perkiraan }
-export function tulisBerkasToken(token, kunciHex, meta) {
+export function tulisBerkasToken(token, kunciPublikPem, meta) {
   fs.mkdirSync(path.dirname(BERKAS_TOKEN), { recursive: true });
-  const isi = { ...meta, ...sandikan(token, kunciHex) };
-  fs.writeFileSync(BERKAS_TOKEN, JSON.stringify(isi, null, 2) + '\n');
+  fs.writeFileSync(BERKAS_TOKEN, JSON.stringify({ ...meta, ...sandikan(token, kunciPublikPem) }, null, 2) + '\n');
 }
