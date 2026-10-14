@@ -15,6 +15,7 @@
 //   node alat/jadwal.mjs geser --grup nama [--mulai ".."] [--jeda-jam 6 | --jeda 15]
 //   node alat/jadwal.mjs batal <id..> | --grup nama | --draf
 //   node alat/jadwal.mjs status | cek
+//   node alat/jadwal.mjs jalankan     nyalakan penerbit sekarang (tayangkan yang sudah jatuh tempo) dan tunggu hasilnya
 //   node alat/jadwal.mjs kirim        kirim commit lokal (mis. dari Pasang Token Instagram.bat) ke GitHub
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,7 +34,7 @@ const { pos, opsi } = bacaArgumen(sisa);
 
 try {
   const fungsi = {
-    semua: semuaKonten, seri, tambah: (a, o) => tambah(a[0], o), daftar, uji, setujui, ubah, geser, batal, status, cek, kirim,
+    semua: semuaKonten, seri, tambah: (a, o) => tambah(a[0], o), daftar, uji, setujui, ubah, geser, batal, status, cek, kirim, jalankan: () => jalankanPenerbit('terbit'),
   }[perintah];
   if (!fungsi) {
     const kepala = [];
