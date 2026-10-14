@@ -1,0 +1,43 @@
+name: Penerbit Instagram
+
+on:
+  schedule:
+    # Tiap 15 menit (waktu UTC). Menit ganjil dipilih karena GitHub sering terlambat di menit 00.
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'terbit | uji | cek | segarkan-token'
+        required: false
+        default: terbit
+      post:
+        description: 'id postingan untuk mode uji (pisahkan dengan koma)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: penerbit-instagram
+  cancel-in-progress: false
+
+jobs:
+  terbit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Penerbit
+        run: node alat/terbitkan.mjs
+        env:
+          MODE: ${{ inputs.mode || 'terbit' }}
+          POST: ${{ inputs.post }}
+          KUNCI_TOKEN: ${{ secrets.KUNCI_TOKEN }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
