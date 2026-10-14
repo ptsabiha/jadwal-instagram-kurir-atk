@@ -344,8 +344,8 @@ async function jalankanPenerbit(mode, post) {
   console.log(` ${info.conclusion || info.status}`);
   const log = jalankan('gh', ['run', 'view', String(run.databaseId), '-R', repo, '--log'], { bolehGagal: true }).stdout || '';
   const pesan = log.split('\n').filter((b) => b.split('\t')[1] === 'Penerbit')
-    .map((b) => b.split('\t').slice(2).join('\t').replace(/^\S+Z\s?/, ''))
-    .filter((b) => b && !/^(##\[|Run |\s*node |\s*env:|\s*(MODE|POST|KUNCI_TOKEN|GIT_\w+):)/.test(b));
+    .map((b) => b.split('\t').slice(2).join('\t').replace(/^\S+Z\s?/, '').replace(/\x1b\[[0-9;]*m/g, ''))
+    .filter((b) => b && !/^(##\[|Run |\s*node |\s*shell:|\s*env:|\s*(MODE|POST|KUNCI_TOKEN|GIT_\w+):)/.test(b));
   if (pesan.length) console.log(pesan.map((b) => `  ${b}`).join('\n'));
   console.log(`  ${info.url}`);
   tarikTerbaru();
