@@ -15,7 +15,7 @@ const PENGATURAN_BAKU = {
   batas_terlambat_jam: 12,  // lewat dari ini, postingan tidak diterbitkan otomatis
   maks_percobaan: 4,        // untuk galat sementara (server Instagram, jaringan)
   jeda_antar_postingan_detik: 20,
-  jarak_jadwal_jam: 6,          // jarak baku antarpostingan saat waktu dihitung otomatis (keputusan pemilik)
+  jarak_jadwal_jam: 3,          // jarak baku antarpostingan saat waktu dihitung otomatis (keputusan pemilik)
   jam_tenang: '22:00-07:00',    // slot otomatis yang jatuh di sini digeser ke akhir jam tenang; '' = mati
   url_gambar: 'https://raw.githubusercontent.com/{repo}/{sha}/antrian/{id}/{berkas}',
 };
@@ -113,7 +113,7 @@ export function diJamTenang(iso, pengaturan) {
 }
 
 // Jam tayang baku per hari: mulai akhir jam tenang (07.00), lalu tiap jarak_jadwal_jam selama
-// di luar jam tenang. Dengan jarak 6 jam dan jam tenang 22.00–07.00: 07.00, 13.00, 19.00.
+// di luar jam tenang. Dengan jarak 3 jam dan jam tenang 22.00–07.00: 07.00, 10.00, 13.00, 16.00, 19.00.
 export function slotHarian(pengaturan) {
   const jt = bacaJamTenang(pengaturan.jam_tenang);
   const awal = jt ? jt.selesai : 7 * 60;
@@ -159,7 +159,7 @@ const SEPEREMPAT_JAM = 15 * 60000;
 const AKTIF = ['draf', 'menunggu', 'terbit'];
 const waktuEfektif = (p) => new Date(p.status === 'terbit' && p.terbit_pada ? p.terbit_pada : p.waktu).getTime();
 
-// Slot otomatis berikutnya: slot baku (07.00/13.00/19.00) yang berjarak minimal jarak_jadwal_jam
+// Slot otomatis berikutnya: slot baku (07.00/10.00/13.00/16.00/19.00) yang berjarak minimal jarak_jadwal_jam
 // dari jadwal terakhir di antrean (draf, menunggu, atau sudah tayang), dan paling cepat 15 menit dari sekarang.
 export function slotBerikut(semua, pengaturan, sekarang = new Date()) {
   const jarak = pengaturan.jarak_jadwal_jam * 3600000;

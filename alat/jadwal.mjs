@@ -1,18 +1,18 @@
 // Alat antrean di PC: menyiapkan, menguji, menyetujui, mengubah, dan membatalkan jadwal.
 // Penerbitan sendiri dilakukan GitHub Actions (terbitkan.mjs).
 //
-// Tanpa --waktu/--mulai, waktu dihitung otomatis: jarak_jadwal_jam (baku 6 jam) setelah postingan
+// Tanpa --waktu/--mulai, waktu dihitung otomatis: jarak_jadwal_jam (baku 3 jam) setelah postingan
 // terakhir di antrean, dan slot yang jatuh di jam tenang (22.00–07.00) digeser ke 07.00.
 //
 //   node alat/jadwal.mjs semua ["<folder Konten Instagram Kurir ATK>"] [--mulai ".."] [--bingkai45]
 //        antrekan SEMUA konten yang belum masuk antrean, urut dari yang dibuat lebih dulu
-//   node alat/jadwal.mjs seri "<folder grid-final>" [--mulai "2026-10-20 07:00"] [--jeda-jam 6 | --jeda 15] [--grup nama] [--bingkai45]
+//   node alat/jadwal.mjs seri "<folder grid-final>" [--mulai "2026-10-20 07:00"] [--jeda-jam 3 | --jeda 15] [--grup nama] [--bingkai45]
 //   node alat/jadwal.mjs tambah "<folder Unggah N>" [--waktu "2026-10-20 19:00"] [--judul ..] [--grup ..] [--urutan N] [--bingkai45]
 //   node alat/jadwal.mjs daftar [--semua] [--json]
 //   node alat/jadwal.mjs uji <id..> | --grup nama | --draf          buat wadah di Instagram tanpa menerbitkan
 //   node alat/jadwal.mjs setujui <id..> | --grup nama | --draf [--tanpa-uji]   draf → menunggu (lalu tayang otomatis)
 //   node alat/jadwal.mjs ubah <id> [--waktu ..] [--caption berkas.txt]
-//   node alat/jadwal.mjs geser --grup nama [--mulai ".."] [--jeda-jam 6 | --jeda 15]
+//   node alat/jadwal.mjs geser --grup nama [--mulai ".."] [--jeda-jam 3 | --jeda 15]
 //   node alat/jadwal.mjs batal <id..> | --grup nama | --draf
 //   node alat/jadwal.mjs status | cek
 //   node alat/jadwal.mjs jalankan     nyalakan penerbit sekarang (tayangkan yang sudah jatuh tempo) dan tunggu hasilnya
@@ -196,7 +196,7 @@ function samaJalur(a, b) {
 }
 
 // Waktu postingan berikutnya dalam satu seri: dengan --jeda/--jeda-jam, tepat sejauh itu
-// (digeser keluar jam tenang); tanpa itu, slot baku berikutnya (07.00/13.00/19.00).
+// (digeser keluar jam tenang); tanpa itu, slot baku berikutnya (07.00/10.00/13.00/16.00/19.00).
 function waktuBerikut(waktu, o, pengaturan) {
   const menit = o.jeda ? Number(o.jeda) : o['jeda-jam'] ? Number(o['jeda-jam']) * 60 : 0;
   if (!menit) return slotSetelah(waktu, pengaturan);
@@ -215,7 +215,7 @@ function anakUnggah(dirInduk) {
 }
 
 function seri([induk], o) {
-  if (!induk) throw new Error('Pakai: seri "<folder>" [--mulai "YYYY-MM-DD HH:MM"] [--jeda-jam 6 | --jeda 15] [--grup nama]');
+  if (!induk) throw new Error('Pakai: seri "<folder>" [--mulai "YYYY-MM-DD HH:MM"] [--jeda-jam 3 | --jeda 15] [--grup nama]');
   const pengaturan = bacaPengaturan();
   const dirInduk = path.resolve(induk);
   const anak = anakUnggah(dirInduk);
@@ -428,7 +428,7 @@ function ubah([id], o) {
 }
 
 function geser(pos, o) {
-  if (!o.grup) throw new Error('Pakai: geser --grup nama [--mulai "YYYY-MM-DD HH:MM"] [--jeda-jam 6 | --jeda 15]');
+  if (!o.grup) throw new Error('Pakai: geser --grup nama [--mulai "YYYY-MM-DD HH:MM"] [--jeda-jam 3 | --jeda 15]');
   tarikTerbaru();
   const pengaturan = bacaPengaturan();
   const semua = bacaSemua();

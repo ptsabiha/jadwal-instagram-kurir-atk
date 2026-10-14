@@ -4,7 +4,7 @@
   "batas_terlambat_jam": 12,
   "maks_percobaan": 4,
   "jeda_antar_postingan_detik": 20,
-  "jarak_jadwal_jam": 6,
+  "jarak_jadwal_jam": 3,
   "jam_tenang": "22:00-07:00",
   "url_gambar": "https://raw.githubusercontent.com/{repo}/{sha}/antrian/{id}/{berkas}"
 }
