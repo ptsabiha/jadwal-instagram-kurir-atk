@@ -12,7 +12,7 @@
   "ukuran": "1080x1440",
   "bingkai45": false,
   "sumber": "D:\\PT SABIHA-Ammar\\Website\\Konten Instagram Kurir ATK\\grid-final\\Unggah 3 - kotak 7 (Lacak kurir)",
-  "status": "menunggu",
+  "status": "terbit",
   "dibuat": "2026-10-14T23:41:05+07:00",
   "percobaan": 0,
   "galat": null,
@@ -21,7 +21,8 @@
     "hasil": "tertunda",
     "pesan": "Belum diuji: Batas pembuatan media Instagram (24 jam bergulir) sudah tercapai, biasanya karena terlalu banyak slide diuji sekaligus. Pulih sendiri saat jendela 24 jam bergeser. (You reached maximum number of posts that is allowed to be created by Content Publishing API. For more context, please check instagram graph api - content publishing developer doc., kode 9/2207069)"
   },
-  "media_id": null,
-  "permalink": null,
-  "terbit_pada": null
+  "media_id": "18132855026505803",
+  "permalink": "https://www.instagram.com/p/DegtKg6icEI/",
+  "terbit_pada": "2026-10-15T17:06:52+07:00",
+  "catatan": "Ditemukan sudah tayang di akun; tidak diposting ulang."
 }
