@@ -12,10 +12,10 @@
   "ukuran": "1080x1440",
   "bingkai45": false,
   "sumber": "D:\\PT SABIHA-Ammar\\Website\\Konten Instagram Kurir ATK\\grid-final\\Unggah 3 - kotak 7 (Lacak kurir)",
-  "status": "menunggu",
+  "status": "gagal",
   "dibuat": "2026-10-14T23:41:05+07:00",
-  "percobaan": 0,
-  "galat": null,
+  "percobaan": 1,
+  "galat": "You reached maximum number of posts that is allowed to be created by Content Publishing API. For more context, please check instagram graph api - content publishing developer doc. (kode 9/2207069)",
   "uji": {
     "pada": "2026-10-14T23:43:57+07:00",
     "hasil": "lolos",
