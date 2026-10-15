@@ -1,4 +1,4 @@
-// Penerbit Instagram. Dijalankan GitHub Actions tiap 15 menit, atau manual dari jadwal.mjs.
+// Penerbit Instagram. Dijalankan penjaga (jaga.mjs) tiap 5 menit di GitHub Actions, atau manual dari jadwal.mjs.
 //   MODE=terbit          terbitkan postingan berstatus "menunggu" yang sudah jatuh tempo (baku)
 //   MODE=uji POST=a,b    buat wadah media di Instagram TANPA menerbitkan (cek gambar & rasio)
 //   MODE=cek             tampilkan akun, kuota publikasi, dan masa berlaku token
@@ -146,6 +146,13 @@ async function uji(ig, igId, pengaturan) {
       p.uji = { pada: isoZona(new Date()), hasil: 'lolos', pesan: 'Instagram menerima semua slide dan caption (belum diterbitkan).' };
       catat(`🧪 Lolos: ${p.judul}`);
     } catch (e) {
+      if (jenisGalat(e) === 'batas') {
+        p.uji = { pada: isoZona(new Date()), hasil: 'tertunda', pesan: `Belum diuji: ${jelaskanGalat(e)}` };
+        catat(`⏳ ${p.judul}: ${p.uji.pesan} Uji sisanya dihentikan supaya kuota tidak makin terkuras.`);
+        simpanPost(p);
+        kode = 1;
+        break;
+      }
       p.uji = { pada: isoZona(new Date()), hasil: 'gagal', pesan: jelaskanGalat(e) };
       catat(`🧪 Gagal: ${p.judul}: ${p.uji.pesan}`);
       kode = 1;

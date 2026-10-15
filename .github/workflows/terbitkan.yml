@@ -1,9 +1,7 @@
 name: Penerbit Instagram
 
+# Hanya dijalankan manual (jadwal.mjs uji/cek/jalankan). Penerbitan rutin dikerjakan penjaga (jaga.yml).
 on:
-  schedule:
-    # Tiap 15 menit (waktu UTC). Menit ganjil dipilih karena GitHub sering terlambat di menit 00.
-    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
     inputs:
       mode:

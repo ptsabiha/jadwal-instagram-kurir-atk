@@ -55,6 +55,7 @@ const SUBKODE = {
   2207020: ['Wadah media kedaluwarsa sebelum diterbitkan.', true],
   2207032: ['Instagram gagal membuat media.', true],
   2207042: ['Batas jumlah postingan API 24 jam sudah tercapai.', true],
+  2207069: ['Batas pembuatan media Instagram (24 jam bergulir) sudah tercapai, biasanya karena terlalu banyak slide diuji sekaligus. Pulih sendiri saat jendela 24 jam bergeser.', true],
   2207050: ['Akun Instagram sedang dibatasi atau tidak aktif. Buka aplikasi Instagram dan cek pemberitahuan.', false],
   2207052: ['Instagram tidak bisa mengambil gambar dari GitHub.', false],
   2207053: ['Galat unggah tidak dikenal dari Instagram.', true],
@@ -64,7 +65,7 @@ const SUBKODE = {
 // 'sementara' (coba lagi), atau 'tetap' (perlu tindakan manusia).
 export function jenisGalat(e) {
   if (e.kode === 190) return 'token';
-  if (e.subkode === 2207042 || [4, 17, 32, 613].includes(e.kode)) return 'batas';
+  if ([2207042, 2207069].includes(e.subkode) || [4, 17, 32, 613].includes(e.kode)) return 'batas';
   if (e.sementara || e.http >= 500 || [1, 2].includes(e.kode)) return 'sementara';
   if (SUBKODE[e.subkode]) return SUBKODE[e.subkode][1] ? 'sementara' : 'tetap';
   return 'tetap';

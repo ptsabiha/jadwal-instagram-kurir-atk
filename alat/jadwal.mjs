@@ -1,5 +1,5 @@
 // Alat antrean di PC: menyiapkan, menguji, menyetujui, mengubah, dan membatalkan jadwal.
-// Penerbitan sendiri dilakukan GitHub Actions (terbitkan.mjs).
+// Penerbitan sendiri dilakukan penjaga di GitHub Actions (jaga.yml → jaga.mjs → terbitkan.mjs), tiap 5 menit.
 //
 // Tanpa --waktu/--mulai, waktu dihitung otomatis: jarak_jadwal_jam (baku 3 jam) setelah postingan
 // terakhir di antrean, dan slot yang jatuh di jam tenang (22.00–07.00) digeser ke 07.00.
@@ -9,13 +9,15 @@
 //   node alat/jadwal.mjs seri "<folder grid-final>" [--mulai "2026-10-20 07:00"] [--jeda-jam 3 | --jeda 15] [--grup nama] [--bingkai45]
 //   node alat/jadwal.mjs tambah "<folder Unggah N>" [--waktu "2026-10-20 19:00"] [--judul ..] [--grup ..] [--urutan N] [--bingkai45]
 //   node alat/jadwal.mjs daftar [--semua] [--json]
-//   node alat/jadwal.mjs uji <id..> | --grup nama | --draf          buat wadah di Instagram tanpa menerbitkan
+//   node alat/jadwal.mjs uji <id..> | --grup nama | --draf [--paksa-uji]   buat wadah di Instagram tanpa menerbitkan
+//        (maks. ±50 wadah sekali uji; Instagram membatasi pembuatan wadah per 24 jam)
 //   node alat/jadwal.mjs setujui <id..> | --grup nama | --draf [--tanpa-uji]   draf → menunggu (lalu tayang otomatis)
 //   node alat/jadwal.mjs ubah <id> [--waktu ..] [--caption berkas.txt]
 //   node alat/jadwal.mjs geser --grup nama [--mulai ".."] [--jeda-jam 3 | --jeda 15]
 //   node alat/jadwal.mjs batal <id..> | --grup nama | --draf
 //   node alat/jadwal.mjs status | cek
-//   node alat/jadwal.mjs jalankan     nyalakan penerbit sekarang (tayangkan yang sudah jatuh tempo) dan tunggu hasilnya
+//   node alat/jadwal.mjs jalankan     tayangkan yang sudah jatuh tempo sekarang (kalau penjaga sedang jalan, cukup tunggu ≤ 5 menit)
+//   node alat/jadwal.mjs penjaga      nyalakan penjaga kalau sedang mati
 //   node alat/jadwal.mjs kirim        kirim commit lokal (mis. dari Pasang Token Instagram.bat) ke GitHub
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,7 +36,7 @@ const { pos, opsi } = bacaArgumen(sisa);
 
 try {
   const fungsi = {
-    semua: semuaKonten, seri, tambah: (a, o) => tambah(a[0], o), daftar, uji, setujui, ubah, geser, batal, status, cek, kirim, jalankan: () => jalankanPenerbit('terbit'),
+    semua: semuaKonten, seri, tambah: (a, o) => tambah(a[0], o), daftar, uji, setujui, ubah, geser, batal, status, cek, kirim, jalankan: jalankanSekarang, penjaga: () => nyalakanPenjaga(true),
   }[perintah];
   if (!fungsi) {
     const kepala = [];
@@ -354,9 +356,21 @@ async function jalankanPenerbit(mode, post) {
   return info;
 }
 
+// Instagram membatasi pembuatan wadah media per 24 jam bergulir (galat 2207069). Pada 15 Okt 2026 uji
+// 60 carousel sekaligus (±420 wadah) menghabiskannya, dan postingan terjadwal tertahan hampir sehari.
+// (Fungsi, bukan const: perintah dijalankan di atas sebelum baris ini dievaluasi.)
+function batasWadahUji() { return 50; }
+function jumlahWadah(p) { return p.slide.length + (p.slide.length > 1 ? 1 : 0); }
+
 async function uji(pos, o) {
   tarikTerbaru();
   const target = pilih(pos, o, bacaSemua());
+  const wadah = target.reduce((n, p) => n + jumlahWadah(p), 0);
+  if (wadah > batasWadahUji() && !o['paksa-uji']) {
+    throw new Error(`Uji ini membuat ${wadah} wadah media (batas aman ${batasWadahUji()}). Instagram membatasi pembuatan wadah per 24 jam, `
+      + 'dan uji massal bisa menahan postingan terjadwal sampai sehari. Uji 1–3 postingan contoh saja; postingan lain dengan '
+      + 'ukuran dan format yang sama boleh disetujui dengan --tanpa-uji. (--paksa-uji kalau memang perlu.)');
+  }
   commitDanPush(`🧪 Kirim untuk uji: ${target.map((p) => p.judul).join(', ')}`, target.map((p) => jalurPost(p.id)));
   await jalankanPenerbit('uji', target.map((p) => p.id).join(','));
   const kini = bacaSemua();
@@ -379,7 +393,7 @@ function setujui(pos, o) {
       && p.uji?.hasil !== 'lolos' && !o['tanpa-uji']) {
       throw new Error(`"${p.judul}" berasio 3:4 dan belum lolos uji. Jalankan "uji" dulu (atau --tanpa-uji kalau sudah yakin).`);
     }
-    if (p.uji?.hasil === 'gagal') throw new Error(`"${p.judul}" gagal uji: ${p.uji.pesan}`);
+    if (p.uji?.hasil === 'gagal' && !(o['tanpa-uji'] && ujiTerpotongKuota(p.uji))) throw new Error(`"${p.judul}" gagal uji: ${p.uji.pesan}`);
   }
   for (const p of target) {
     p.status = 'menunggu';
@@ -399,7 +413,13 @@ function setujui(pos, o) {
     console.log(`⏰ ${p.judul}: ${formatWIB(p.waktu)}${lewat ? ' (waktunya sudah lewat, tayang pada putaran penerbit berikutnya ≤ 15 menit)' : ''}`);
     for (const w of peringatanJadwal(p, kini, pengaturan)) console.log(`   ⚠️ ${w}`);
   }
-  console.log('Penerbit di GitHub memeriksa antrean tiap 15 menit; GitHub kadang terlambat beberapa menit.');
+  console.log('Penjaga di GitHub memeriksa antrean tiap 5 menit.');
+  nyalakanPenjaga();
+}
+
+// Uji yang gagal karena kuota/laju (bukan karena gambar atau caption). Catatan lama belum punya hasil 'tertunda'.
+function ujiTerpotongKuota(u) {
+  return u.hasil === 'tertunda' || /2207069|2207042|kode (4|17|32|613)\//.test(u.pesan || '');
 }
 
 function bisaDiubah(p) {
@@ -422,7 +442,7 @@ function ubah([id], o) {
   if (o.judul) p.judul = String(o.judul);
   if (p.status === 'gagal') { p.status = 'menunggu'; p.percobaan = 0; p.galat = null; }
   simpanPost(p);
-  if (p.status !== 'draf') commitDanPush(`✏️ Diubah: ${p.judul}`, [jalurPost(p.id)]);
+  if (p.status !== 'draf') { commitDanPush(`✏️ Diubah: ${p.judul}`, [jalurPost(p.id)]); if (p.status === 'menunggu') nyalakanPenjaga(); }
   console.log(`✏️ ${p.judul}: ${p.status}, ${formatWIB(p.waktu)}`);
   for (const w of peringatanJadwal(p, semua, pengaturan)) console.log(`   ⚠️ ${w}`);
 }
@@ -443,7 +463,7 @@ function geser(pos, o) {
     console.log(`↪️ ${p.judul}: ${formatWIB(p.waktu)} (${p.status})`);
   });
   const terkirim = target.filter((p) => p.status !== 'draf');
-  if (terkirim.length) commitDanPush(`↪️ Digeser: grup ${o.grup}`, terkirim.map((p) => jalurPost(p.id)));
+  if (terkirim.length) { commitDanPush(`↪️ Digeser: grup ${o.grup}`, terkirim.map((p) => jalurPost(p.id))); nyalakanPenjaga(); }
 }
 
 function batal(pos, o) {
@@ -486,11 +506,50 @@ function status() {
   if (lokal) console.log(`⚠️ ${lokal} commit lokal belum terkirim ke GitHub (mis. token baru). Jalankan "kirim".`);
   const repo = repoGitHub();
   if (!repo) return;
+  const pj = statusPenjaga(repo);
+  if (pj) console.log(`Penjaga: ${pj.jalan ? `✅ sedang jalan sejak ${formatWIB(pj.jalan.createdAt)} (cek tiap 5 menit)` : '⚠️ tidak jalan'}`
+    + `${pj.gagal ? `; run terakhir ❌ ${pj.gagal.url}` : ''}`);
   const r = jalankan('gh', ['run', 'list', '-R', repo, '--workflow', 'terbitkan.yml', '-L', '6', '--json', 'conclusion,status,createdAt,event,url'], { bolehGagal: true });
   if (r.status === 0) {
-    console.log('Jalan penerbit terakhir:');
+    console.log('Jalan penerbit manual terakhir:');
     for (const x of JSON.parse(r.stdout)) console.log(`  ${x.conclusion === 'success' ? '✅' : x.conclusion === 'failure' ? '❌' : '…'} ${formatWIB(x.createdAt)} ${x.event}${x.conclusion === 'failure' ? `  ${x.url}` : ''}`);
   }
+}
+
+// ---------- Penjaga ----------
+
+function statusPenjaga(repo) {
+  const r = jalankan('gh', ['run', 'list', '-R', repo, '--workflow', 'jaga.yml', '-L', '8', '--json', 'status,conclusion,createdAt,url'], { bolehGagal: true });
+  if (r.status !== 0) return null;
+  const runs = JSON.parse(r.stdout);
+  return {
+    jalan: runs.find((x) => x.status === 'in_progress'),
+    antre: runs.find((x) => ['queued', 'pending', 'waiting', 'requested'].includes(x.status)),
+    gagal: runs.find((x) => x.status === 'completed' && x.conclusion !== 'cancelled')?.conclusion === 'failure'
+      ? runs.find((x) => x.status === 'completed' && x.conclusion !== 'cancelled') : null,
+  };
+}
+
+function nyalakanPenjaga(lapor = false) {
+  const repo = repoGitHub();
+  if (!repo) return;
+  const pj = statusPenjaga(repo);
+  if (pj?.jalan || pj?.antre) {
+    if (lapor) console.log(`✅ Penjaga sudah ${pj.jalan ? 'jalan' : 'dalam antrean'}.`);
+    return;
+  }
+  const r = jalankan('gh', ['workflow', 'run', 'jaga.yml', '-R', repo], { bolehGagal: true });
+  console.log(r.status === 0 ? '🔁 Penjaga dinyalakan (mulai dalam ±1 menit).'
+    : `⚠️ Penjaga gagal dinyalakan: ${(r.stderr || r.stdout).trim()}`);
+}
+
+async function jalankanSekarang() {
+  const repo = repoGitHub();
+  const pj = repo && statusPenjaga(repo);
+  // Jangan jalankan penerbit kedua bersamaan dengan penjaga: dua penerbit bisa memposting hal yang sama.
+  if (pj?.jalan) return console.log('✅ Penjaga sedang jalan; postingan yang jatuh tempo tayang dalam ≤ 5 menit. Pantau dengan "daftar".');
+  await jalankanPenerbit('terbit');
+  nyalakanPenjaga();
 }
 
 async function cek() {

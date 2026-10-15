@@ -1,0 +1,39 @@
+name: Penjaga Jadwal
+
+# Penjaga jalan terus (±5 jam 45 menit per run) dan menjalankan penerbit tiap 5 menit.
+# Run berikutnya dipesan oleh run yang sedang jalan (lihat alat/jaga.mjs), jadi tidak bergantung
+# pada cron GitHub yang sering telat berjam-jam. Cron di bawah hanya cadangan untuk menyalakan
+# penjaga lagi kalau rantainya putus, dan untuk perpanjangan token saat antrean kosong.
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+# Satu penjaga saja. Run baru menunggu (pending) sampai yang jalan selesai; GitHub hanya
+# menyimpan satu run yang menunggu, jadi tidak menumpuk.
+concurrency:
+  group: penjaga-jadwal
+  cancel-in-progress: false
+
+jobs:
+  jaga:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Penjaga
+        run: node alat/jaga.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KUNCI_PRIVAT: ${{ secrets.KUNCI_PRIVAT }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
