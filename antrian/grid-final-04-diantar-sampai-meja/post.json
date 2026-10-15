@@ -1,6 +1,6 @@
 {
   "judul": "Diantar sampai meja",
-  "waktu": "2026-10-15T11:30:00+07:00",
+  "waktu": "2026-10-15T21:05:00+07:00",
   "grup": "grid-final",
   "urutan": 4,
   "caption": "Diantar kurir sampai ke meja Anda, tidak perlu keluar kantor. 🛵\n\nBelanja banyak untuk pengadaan semester atau kebutuhan bulanan? Ajukan penawaran harga langsung dari aplikasi:\n1. Kirim isi keranjang ke admin\n2. Admin membalas harga per barang beserta masa berlakunya\n3. Setujui, pesanan langsung dibuat\n\nDaftar gratis 👉 link di bio\nTanya dulu? WA 0831-8442-0096\n\n#KurirATK #ATKCianjur #Cianjur #AlatTulisKantor #PengadaanSekolah #SekolahCianjur #PesantrenCianjur",
@@ -12,10 +12,10 @@
   "ukuran": "1080x1440",
   "bingkai45": false,
   "sumber": "D:\\PT SABIHA-Ammar\\Website\\Konten Instagram Kurir ATK\\grid-final\\Unggah 4 - kotak 6 (Diantar sampai meja)",
-  "status": "gagal",
+  "status": "menunggu",
   "dibuat": "2026-10-14T23:41:06+07:00",
-  "percobaan": 1,
-  "galat": "You reached maximum number of posts that is allowed to be created by Content Publishing API. For more context, please check instagram graph api - content publishing developer doc. (kode 9/2207069)",
+  "percobaan": 0,
+  "galat": null,
   "uji": {
     "pada": "2026-10-14T23:44:13+07:00",
     "hasil": "lolos",
