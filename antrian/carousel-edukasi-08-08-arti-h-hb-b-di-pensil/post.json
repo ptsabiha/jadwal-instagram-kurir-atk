@@ -19,7 +19,11 @@
   "dibuat": "2026-10-15T07:09:27+07:00",
   "percobaan": 0,
   "galat": null,
-  "uji": null,
+  "uji": {
+    "pada": "2026-10-15T07:15:46+07:00",
+    "hasil": "lolos",
+    "pesan": "Instagram menerima semua slide dan caption (belum diterbitkan)."
+  },
   "media_id": null,
   "permalink": null,
   "terbit_pada": null

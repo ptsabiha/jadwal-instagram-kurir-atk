@@ -19,7 +19,11 @@
   "dibuat": "2026-10-15T07:11:00+07:00",
   "percobaan": 0,
   "galat": null,
-  "uji": null,
+  "uji": {
+    "pada": "2026-10-15T07:33:17+07:00",
+    "hasil": "gagal",
+    "pesan": "You reached maximum number of posts that is allowed to be created by Content Publishing API. For more context, please check instagram graph api - content publishing developer doc. (kode 9/2207069)"
+  },
   "media_id": null,
   "permalink": null,
   "terbit_pada": null

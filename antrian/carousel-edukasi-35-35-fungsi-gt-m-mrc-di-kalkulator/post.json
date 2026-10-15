@@ -19,7 +19,11 @@
   "dibuat": "2026-10-15T07:10:17+07:00",
   "percobaan": 0,
   "galat": null,
-  "uji": null,
+  "uji": {
+    "pada": "2026-10-15T07:26:02+07:00",
+    "hasil": "gagal",
+    "pesan": "You are hitting rate-limits on the node that you are attempting to fetch. Please wait and try again later. (kode 4/1349210)"
+  },
   "media_id": null,
   "permalink": null,
   "terbit_pada": null
