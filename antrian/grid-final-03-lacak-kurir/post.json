@@ -17,9 +17,9 @@
   "percobaan": 0,
   "galat": null,
   "uji": {
-    "pada": "2026-10-14T23:43:57+07:00",
-    "hasil": "lolos",
-    "pesan": "Instagram menerima semua slide dan caption (belum diterbitkan)."
+    "pada": "2026-10-15T16:19:33+07:00",
+    "hasil": "tertunda",
+    "pesan": "Belum diuji: Batas pembuatan media Instagram (24 jam bergulir) sudah tercapai, biasanya karena terlalu banyak slide diuji sekaligus. Pulih sendiri saat jendela 24 jam bergeser. (You reached maximum number of posts that is allowed to be created by Content Publishing API. For more context, please check instagram graph api - content publishing developer doc., kode 9/2207069)"
   },
   "media_id": null,
   "permalink": null,
